@@ -1,6 +1,9 @@
+import logging
 import requests
 import json
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are a professional chef and nutritionist. 
 When given a list of ingredients, you generate ONE complete recipe and calculate the calorie count.
@@ -16,6 +19,7 @@ You MUST respond ONLY with valid JSON, no markdown, no explanation, just raw JSO
   ],
   "calories_total": 286
 }"""
+
 
 def generate_recipe(ingredients: list[str]) -> dict:
     ingredients_str = ", ".join(ingredients)
@@ -48,7 +52,9 @@ Respond ONLY with JSON, no extra text."""
     )
 
     if response.status_code != 200:
-        raise Exception(f"LLM API error: {response.status_code} - {response.text}")
+        # Log detail untuk debugging server-side, jangan expose ke client
+        logger.error("LLM API error: status=%s body=%s", response.status_code, response.text[:500])
+        raise Exception("LLM API returned non-200 status")
 
     data = response.json()
     content = data["choices"][0]["message"]["content"]
