@@ -1,9 +1,13 @@
+import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash
 from models.user import User
 
+logger = logging.getLogger(__name__)
+
 auth_bp = Blueprint("auth", __name__)
+
 
 @auth_bp.route("/login", methods=["POST"])
 def login():

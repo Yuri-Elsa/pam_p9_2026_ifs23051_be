@@ -1,9 +1,12 @@
+import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from extensions import db
+from extensions import db, limiter
 from models.recipe import Recipe
 from services.ai_service import generate_recipe
 import json
+
+logger = logging.getLogger(__name__)
 
 recipe_bp = Blueprint("recipes", __name__)
 
@@ -15,6 +18,7 @@ def get_recipes():
 
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 10, type=int)
+    per_page = min(per_page, 50)  # Batasi maksimal 50 per halaman
 
     pagination = Recipe.query.filter_by(user_id=user_id)\
         .order_by(Recipe.created_at.desc())\
@@ -43,6 +47,7 @@ def get_recipe(recipe_id):
 
 @recipe_bp.route("/generate", methods=["POST"])
 @jwt_required()
+@limiter.limit("10 per minute;50 per day")  # Lindungi endpoint LLM berbayar
 def generate():
     user_id = int(get_jwt_identity())
     data = request.get_json()
@@ -64,7 +69,9 @@ def generate():
     try:
         result = generate_recipe(ingredients)
     except Exception as e:
-        return jsonify({"message": f"AI generation failed: {str(e)}"}), 500
+        # Log detail error di server, jangan bocorkan ke client
+        logger.error("AI generation failed for user %s: %s", user_id, str(e))
+        return jsonify({"message": "Failed to generate recipe. Please try again later."}), 500
 
     recipe = Recipe(
         user_id=user_id,
